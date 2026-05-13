@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ethiopia Arbovirus Outbreak Tracker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --bg-secondary: #f5f5f3;
+      --bg-card: #ffffff;
+      --text: #1a1a18;
+      --text-muted: #6b6b67;
+      --text-faint: #9b9b97;
+      --border: rgba(0,0,0,0.1);
+      --border-strong: rgba(0,0,0,0.2);
+      --denv: #378ADD;
+      --yfv: #D85A30;
+      --chikv: #1D9E75;
+      --rvfv: #BA7517;
+      --zikv: #7F77DD;
+      --wnv: #888780;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a18;
+        --bg-secondary: #242422;
+        --bg-card: #242422;
+        --text: #f0f0ec;
+        --text-muted: #9b9b97;
+        --text-faint: #6b6b67;
+        --border: rgba(255,255,255,0.1);
+        --border-strong: rgba(255,255,255,0.2);
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 0.5px solid var(--border);
+      padding: 1.5rem 2rem;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    header p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    nav {
+      background: var(--bg);
+      border-bottom: 0.5px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+
+    .nav-tab {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      transition: color 0.15s;
+    }
+
+    .nav-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+      font-weight: 500;
+    }
+
+    .nav-tab:hover { color: var(--text); }
+
+    main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .metric {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .metric-sub {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 1rem;
+      margin-top: 2rem;
+    }
+
+    h2:first-child { margin-top: 0; }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      background: var(--bg);
+      border: 0.5px solid var(--border-strong);
+      border-radius: 99px;
+      padding: 5px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn:hover { background: var(--bg-secondary); color: var(--text); }
+
+    .filter-btn.active {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+      font-weight: 500;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      margin-bottom: 2rem;
+    }
+
+    .virus-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .virus-card {
+      background: var(--bg-card);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .virus-card:hover { border-color: var(--border-strong); }
+
+    .virus-card.active {
+      border: 2px solid #378ADD;
+    }
+
+    .virus-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .virus-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .virus-abbr {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .virus-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 3px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    .virus-row:last-child { border-bottom: none; }
+    .virus-row span:last-child { color: var(--text); font-weight: 500; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      padding: 0 12px 10px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    td {
+      padding: 10px 12px 10px 0;
+      border-bottom: 0.5px solid var(--border);
+      vertical-align: top;
+      color: var(--text);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .about-block {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .about-block strong { color: var(--text); }
+
+    .ref-list {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    .ref-list li {
+      margin-bottom: 8px;
+      list-style: none;
+      padding-left: 1.2rem;
+      position: relative;
+    }
+
+    .ref-list li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--text-faint);
+    }
+
+    footer {
+      border-top: 0.5px solid var(--border);
+      padding: 1.5rem 2rem;
+      font-size: 12px;
+      color: var(--text-faint);
+      text-align: center;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      header { padding: 1rem; }
+      nav { padding: 0 1rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🇪🇹 Ethiopia Arbovirus Outbreak Tracker</h1>
+  <p>Epidemiology and ecology of arboviruses in Ethiopia &mdash; compiled from published literature 2013&ndash;2021 &middot; By Dawit Baye, Bahir Dar University</p>
+</header>
+
+<nav>
+  <button class="nav-tab active" data-tab="overview">Overview</button>
+  <button class="nav-tab" data-tab="viruses">Viruses</button>
+  <button class="nav-tab" data-tab="outbreaks">Outbreaks</button>
+  <button class="nav-tab" data-tab="about">About</button>
+</nav>
+
+<main>
+
+  <!-- OVERVIEW -->
+  <section class="section active" id="tab-overview">
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Viruses tracked</div>
+        <div class="metric-value">6</div>
+        <div class="metric-sub">DENV, YFV, CHIKV, RVFV, ZIKV, WNV</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Documented outbreaks</div>
+        <div class="metric-value">12</div>
+        <div class="metric-sub">2013 – 2021</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Regions affected</div>
+        <div class="metric-value">7+</div>
+        <div class="metric-sub">Somali, Afar, SNNP, Dire Dawa...</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Largest outbreak</div>
+        <div class="metric-value">41,162</div>
+        <div class="metric-sub">CHIKV, Dire Dawa 2019</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">DENV RNA prevalence</div>
+        <div class="metric-value">48%</div>
+        <div class="metric-sub">Meta-analysis pooled</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">CHIKV seroprevalence</div>
+        <div class="metric-value">24%</div>
+        <div class="metric-sub">Pooled meta-analysis</div>
+      </div>
+    </div>
+
+    <h2>Cases by year</h2>
+
+    <div class="filters" id="overviewFilters">
+      <button class="filter-btn active" data-virus="all">All viruses</button>
+      <button class="filter-btn" data-virus="DENV">DENV</button>
+      <button class="filter-btn" data-virus="YFV">YFV</button>
+      <button class="filter-btn" data-virus="CHIKV">CHIKV</button>
+      <button class="filter-btn" data-virus="RVFV">RVFV</button>
+    </div>
+
+    <div class="legend" id="overviewLegend">
+      <span class="legend-item"><span class="legend-dot" style="background:#378ADD"></span>DENV</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#D85A30"></span>YFV</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>CHIKV</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>RVFV</span>
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="timelineChart" role="img" aria-label="Stacked bar chart of arbovirus cases in Ethiopia 2013 to 2021">Outbreak case counts by year and virus type.</canvas>
+    </div>
+
+    <h2>Seroprevalence summary</h2>
+    <div class="chart-wrap" style="height:220px;">
+      <canvas id="seroChart" role="img" aria-label="Bar chart of seroprevalence percentages for each virus">Pooled seroprevalence data from meta-analyses.</canvas>
+    </div>
+
+  </section>
+
+  <!-- VIRUSES -->
+  <section class="section" id="tab-viruses">
+    <h2>All tracked viruses</h2>
+    <div class="virus-grid">
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#EBF4FD;color:#185FA5">Flaviviridae</span>
+        <div class="virus-name">Dengue Virus</div>
+        <div class="virus-abbr">DENV &middot; Genus Flavivirus</div>
+        <div class="virus-row"><span>Vector</span><span>Ae. aegypti, Ae. albopictus</span></div>
+        <div class="virus-row"><span>Serotypes</span><span>DENV 1, 2, 3, 4</span></div>
+        <div class="virus-row"><span>IgM prevalence</span><span>9%</span></div>
+        <div class="virus-row"><span>IgG prevalence</span><span>21%</span></div>
+        <div class="virus-row"><span>RNA prevalence</span><span>48%</span></div>
+        <div class="virus-row"><span>First outbreak</span><span>2013, Dire Dawa</span></div>
+        <div class="virus-row"><span>Genome</span><span>+ssRNA</span></div>
+      </div>
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#FCEEE9;color:#993C1D">Flaviviridae</span>
+        <div class="virus-name">Yellow Fever Virus</div>
+        <div class="virus-abbr">YFV &middot; Genus Flavivirus</div>
+        <div class="virus-row"><span>Vector</span><span>Ae. aegypti + others</span></div>
+        <div class="virus-row"><span>Serotypes</span><span>1 serotype, 7 genotypes</span></div>
+        <div class="virus-row"><span>CFR (1966)</span><span>20.5%</span></div>
+        <div class="virus-row"><span>CFR (2013)</span><span>30.5%</span></div>
+        <div class="virus-row"><span>WHO risk level</span><span>High (EYE strategy)</span></div>
+        <div class="virus-row"><span>Genome size</span><span>~11 kb</span></div>
+        <div class="virus-row"><span>BSL level</span><span>BSL-3 / BSL-4</span></div>
+      </div>
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#E2F5EE;color:#0F6E56">Togaviridae</span>
+        <div class="virus-name">Chikungunya Virus</div>
+        <div class="virus-abbr">CHIKV &middot; Genus Alphavirus</div>
+        <div class="virus-row"><span>Vector</span><span>Ae. aegypti, Ae. albopictus</span></div>
+        <div class="virus-row"><span>Lineages</span><span>3 (W. African, E/C African, Asian)</span></div>
+        <div class="virus-row"><span>Seroprevalence</span><span>24%</span></div>
+        <div class="virus-row"><span>Attack rate (2019)</span><span>12.3%</span></div>
+        <div class="virus-row"><span>Fatalities (2019)</span><span>0</span></div>
+        <div class="virus-row"><span>First outbreak</span><span>2016, Dollo Ado</span></div>
+        <div class="virus-row"><span>Genome</span><span>+ssRNA, ~70 nm</span></div>
+      </div>
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#FBF0E0;color:#854F0B">Phenuiviridae</span>
+        <div class="virus-name">Rift Valley Fever Virus</div>
+        <div class="virus-abbr">RVFV &middot; Genus Phlebovirus</div>
+        <div class="virus-row"><span>Vector</span><span>Aedes, Anopheles, Culex</span></div>
+        <div class="virus-row"><span>Prevalence</span><span>9.26% (pooled)</span></div>
+        <div class="virus-row"><span>Main host</span><span>Livestock / ruminants</span></div>
+        <div class="virus-row"><span>Mild cases</span><span>~98%</span></div>
+        <div class="virus-row"><span>Person-to-person</span><span>None reported</span></div>
+        <div class="virus-row"><span>Outbreak trigger</span><span>Heavy rainfall</span></div>
+        <div class="virus-row"><span>Prev. family</span><span>Bunyaviridae (old)</span></div>
+      </div>
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#EEEDFE;color:#534AB7">Flaviviridae</span>
+        <div class="virus-name">Zika Virus</div>
+        <div class="virus-abbr">ZIKV &middot; Genus Flavivirus</div>
+        <div class="virus-row"><span>Vector</span><span>Ae. aegypti</span></div>
+        <div class="virus-row"><span>Pooled prevalence</span><span>13.63%</span></div>
+        <div class="virus-row"><span>High-risk region</span><span>Gambella</span></div>
+        <div class="virus-row"><span>Key concern</span><span>Blood transfusion safety</span></div>
+        <div class="virus-row"><span>Ethiopia data</span><span>Limited (2 studies)</span></div>
+        <div class="virus-row"><span>Global pattern</span><span>Highest in Americas</span></div>
+      </div>
+
+      <div class="virus-card">
+        <span class="virus-tag" style="background:#EEEDFE;color:#534AB7">Flaviviridae</span>
+        <div class="virus-name">West Nile Virus</div>
+        <div class="virus-abbr">WNV &middot; Genus Flavivirus</div>
+        <div class="virus-row"><span>Vector</span><span>Aedes spp.</span></div>
+        <div class="virus-row"><span>Risk status</span><span>Recognized threat</span></div>
+        <div class="virus-row"><span>Outbreak data</span><span>Limited in Ethiopia</span></div>
+        <div class="virus-row"><span>Family</span><span>Flaviviridae</span></div>
+        <div class="virus-row"><span>Compared to DENV</span><span>Less documented</span></div>
+        <div class="virus-row"><span>Priority</span><span>Moderate</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- OUTBREAKS -->
+  <section class="section" id="tab-outbreaks">
+    <h2>Outbreak timeline</h2>
+    <div class="filters" id="outbreakFilters">
+      <button class="filter-btn active" data-virus="all">All viruses</button>
+      <button class="filter-btn" data-virus="DENV">DENV</button>
+      <button class="filter-btn" data-virus="YFV">YFV</button>
+      <button class="filter-btn" data-virus="CHIKV">CHIKV</button>
+      <button class="filter-btn" data-virus="RVFV">RVFV</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Virus</th>
+          <th>Location</th>
+          <th>Cases</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="outbreakBody"></tbody>
+    </table>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section" id="tab-about">
+    <h2>About this project</h2>
+
+    <div class="about-block">
+      <p>This dashboard was built as part of an <strong>Advanced Virology assignment</strong> at Bahir Dar University, College of Medicine and Health Sciences, Department of Medical Microbiology.</p>
+      <br>
+      <p><strong>Title:</strong> The prevailing epidemiology and ecology of arboviruses in Ethiopia</p>
+      <p><strong>Author:</strong> Dawit Baye &middot; ID: BDU-1807458</p>
+      <p><strong>Instructor:</strong> Mr. Awoke Derbie</p>
+    </div>
+
+    <h2>Methods</h2>
+    <div class="about-block">
+      <p>Data compiled from systematic searches across PubMed, Google Scholar, and ScienceDirect using terms including <em>"arbovirus Ethiopia"</em>, <em>"dengue epidemiology Ethiopia"</em>, and <em>"vector-borne disease East Africa"</em>. Studies published between 2014–2025 were prioritized. Citation management via Zotero.</p>
+    </div>
+
+    <h2>References</h2>
+    <ul class="ref-list">
+      <li>Nigussie E. et al. (2024). Dengue virus infection in Ethiopia: A systematic review and meta-analysis. <em>BMC Infectious Diseases</em>, 24(1), 297.</li>
+      <li>Gedefie A. et al. (2025). Epidemiology of arboviruses in humans and livestock in Ethiopia: A systematic review and meta-analysis. <em>BMC Infectious Diseases</em>, 25(1), 458.</li>
+      <li>Dagnaw G.G. et al. (2025). Seroprevalence and risk factors of Chikungunya in Ethiopia: A systematic review and meta-analysis. <em>Frontiers in Public Health</em>, 13, 1538911.</li>
+      <li>Asebe G. et al. (2021). Seroprevalence of Yellow fever, Chikungunya, and Zika virus in Gambella Region, Ethiopia. <em>PLOS ONE</em>, 16(7), e0253953.</li>
+      <li>Lilay A. et al. (2017). Reemergence of yellow fever in Ethiopia after 50 years, 2013. <em>BMC Infectious Diseases</em>, 17(1), 343.</li>
+      <li>Weldehanna D.G. et al. (2025). The magnitude of flaviviruses infection in Ethiopia. <em>BMC Infectious Diseases</em>, 25(1), 997.</li>
+      <li>Richman D.D., Whitley R.J., Hayden F.G. (2017). <em>Clinical Virology</em> (4th ed). ASM Press.</li>
+      <li>WHO. (2024). Rift Valley Fever fact sheet. World Health Organization.</li>
+      <li>CDC. (2024). Yellow Fever Transmission. Centers for Disease Control and Prevention.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  &copy; 2025 Dawit Baye &middot; Bahir Dar University &middot; Department of Medical Microbiology &middot; Built with HTML, CSS & JavaScript
+</footer>
+
+<script>
+  const outbreaks = [
+    { year: 1966, virus: 'YFV',  location: 'Arbaminch, Gamo Gofa', cases: 2200,  notes: 'Largest YFV outbreak in Ethiopia; 450 deaths, CFR 20.5%' },
+    { year: 2013, virus: 'DENV', location: 'Dire Dawa', cases: 12000, notes: 'First reported DENV outbreak; 88 confirmed, 50 DENV-2 positive' },
+    { year: 2013, virus: 'YFV',  location: 'South Omo Zone, SNNPR', cases: 141,   notes: '43 deaths, CFR 30.5%; Debub Ari district most affected' },
+    { year: 2014, virus: 'DENV', location: 'Dire Dawa / Godey / Adar', cases: 440, notes: 'Jan–Mar outbreaks across 3 regions; DENV-1, 2, 3 serotypes' },
+    { year: 2016, virus: 'CHIKV', location: 'Dollo Ado, Somali Region', cases: null, notes: 'First documented CHIKV case in Ethiopia (Suuf kebele)' },
+    { year: 2017, virus: 'DENV', location: 'Kabridahar, Somali Region', cases: 101,  notes: '5 severe DF cases, 1 death reported' },
+    { year: 2018, virus: 'YFV',  location: 'Wolaita Zone, Offa Woreda', cases: 35,   notes: '10 deaths reported' },
+    { year: 2019, virus: 'DENV', location: 'Gewane / Amibara, Afar', cases: 588,  notes: 'Started September 16, 2019' },
+    { year: 2019, virus: 'CHIKV', location: 'Dire Dawa (+ Afar, Somali)', cases: 41162, notes: 'Attack rate 12.3%, zero fatalities; spread to 9 kebeles' },
+    { year: 2020, virus: 'YFV',  location: 'Gurage Zone, SNNP', cases: 86,    notes: 'Inemoreena Enor District' },
+    { year: 2021, virus: 'DENV', location: 'Warder Woreda, Dolo Zone, Somali', cases: 160, notes: 'Confirmed DENV cases; area had past outbreaks 2017–2018' },
+    { year: 2021, virus: 'DENV', location: 'Dolo Ado, Liban Zone, Somali', cases: 47,  notes: 'Suspected DF cases' },
+  ];
+
+  const colors = {
+    DENV:  '#378ADD',
+    YFV:   '#D85A30',
+    CHIKV: '#1D9E75',
+    RVFV:  '#BA7517',
+    ZIKV:  '#7F77DD',
+    WNV:   '#888780',
+  };
+
+  // --- Tabs ---
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // --- Timeline chart ---
+  const chartYears = [...new Set(outbreaks.filter(o => o.year >= 2013).map(o => o.year))].sort();
+  const chartViruses = ['DENV', 'YFV', 'CHIKV', 'RVFV'];
+
+  function buildDatasets(filterVirus) {
+    return (filterVirus === 'all' ? chartViruses : [filterVirus]).map(v => ({
+      label: v,
+      data: chartYears.map(y => outbreaks.filter(o => o.year === y && o.virus === v).reduce((s, o) => s + (o.cases || 0), 0)),
+      backgroundColor: colors[v] + 'BB',
+      borderColor: colors[v],
+      borderWidth: 1,
+    }));
+  }
+
+  const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+  const timelineChart = new Chart(timelineCtx, {
+    type: 'bar',
+    data: { labels: chartYears.map(String), datasets: buildDatasets('all') },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#888' } },
+        y: { stacked: true, grid: { color: 'rgba(128,128,128,0.12)' }, ticks: { color: '#888', callback: v => v >= 1000 ? Math.round(v / 1000) + 'k' : v } }
+      }
+    }
+  });
+
+  // --- Sero chart ---
+  const seroCtx = document.getElementById('seroChart').getContext('2d');
+  new Chart(seroCtx, {
+    type: 'bar',
+    data: {
+      labels: ['DENV IgM', 'DENV IgG', 'DENV RNA', 'CHIKV', 'ZIKV', 'RVFV'],
+      datasets: [{
+        label: 'Prevalence (%)',
+        data: [9, 21, 48, 24, 13.63, 9.26],
+        backgroundColor: ['#378ADDBB','#378ADD88','#378ADD44','#1D9E75BB','#7F77DDBB','#BA7517BB'],
+        borderColor:     ['#378ADD',  '#378ADD',  '#378ADD',  '#1D9E75',  '#7F77DD',  '#BA7517'],
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#888' } },
+        y: { grid: { color: 'rgba(128,128,128,0.12)' }, ticks: { color: '#888', callback: v => v + '%' }, max: 55 }
+      }
+    }
+  });
+
+  // --- Overview filter ---
+  document.getElementById('overviewFilters').addEventListener('click', e => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('#overviewFilters .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    timelineChart.data.datasets = buildDatasets(btn.dataset.virus);
+    timelineChart.update();
+  });
+
+  // --- Outbreak table ---
+  function renderTable(filterVirus) {
+    const filtered = filterVirus === 'all' ? outbreaks : outbreaks.filter(o => o.virus === filterVirus);
+    const sorted = [...filtered].sort((a, b) => b.year - a.year);
+    document.getElementById('outbreakBody').innerHTML = sorted.map(o => {
+      const c = colors[o.virus];
+      return `<tr>
+        <td>${o.year}</td>
+        <td><span class="badge" style="background:${c}22;color:${c}">${o.virus}</span></td>
+        <td>${o.location}</td>
+        <td>${o.cases ? o.cases.toLocaleString() : '—'}</td>
+        <td style="color:#888">${o.notes}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  renderTable('all');
+
+  document.getElementById('outbreakFilters').addEventListener('click', e => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('#outbreakFilters .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(btn.dataset.virus);
+  });
+</script>
+
+</body>
+</html>
